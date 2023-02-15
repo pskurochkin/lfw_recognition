@@ -38,10 +38,9 @@ class LFWDataset(Dataset):
         random.shuffle(self.labled_pairs)
 
         self.transform = T.Compose([T.ConvertImageDtype(torch.float32),
-                                    T.Resize((224, 224))])
-
-        self.normalize = T.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+                                    T.Resize((224, 224)),
+                                    T.Normalize(mean=[0.485, 0.456, 0.406],
+                                                std=[0.229, 0.224, 0.225])])
 
         self.triplet_mode = triplet_mode
 
@@ -72,18 +71,16 @@ class LFWDataset(Dataset):
             anchor_img, pos_img, neg_img = list(map(self.transform,
                                                     [anchor_img, pos_img, neg_img]))
 
-            # normalize
-            anchor_img, pos_img, neg_img = list(map(self.normalize,
-                                                    [anchor_img, pos_img, neg_img]))
-
             return anchor_img, pos_img, neg_img
         else:
             face_id, img_name = self.faces[idx]
 
-            face_id = torch.tensor(face_id, dtype=torch.int64)
-            img = read_image(os.path.join(self.root_dir, str(face_id), img_name))
+            label = torch.tensor(face_id, dtype=torch.int64)
 
-            return self.transform(img), face_id
+            img = read_image(os.path.join(self.root_dir, str(face_id), img_name))
+            img = self.transform(img)
+
+            return label, img
 
 def load_data(root_dir):
     faces = []
@@ -96,10 +93,7 @@ def load_data(root_dir):
     return train_faces, test_faces
 
 def create_dataloader(root_dir, faces, batch_size=1, training=False):
-    if not training:
-        assert batch_size == 1
-
-    dataset = LFWDataset(root_dir, faces, triplet_mode=training)
+    dataset = LFWDataset(root_dir, faces, triplet_mode=True)
 
     n_samples = (10000 // batch_size + 1) * batch_size
     sampler = RandomSampler(dataset, num_samples=n_samples) if training else None
